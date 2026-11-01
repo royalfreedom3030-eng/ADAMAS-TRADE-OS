@@ -36,7 +36,7 @@ Copy `.env.example` to `.env.local` before starting Vite. The public
 `VITE_API_BASE_URL` is embedded at build time; rebuild when it changes.
 The supplied URL is a configuration target, not evidence that the backend exists
 or is reachable. The UI shows a disconnected/error state until authentication
-and API access work. Live mode never displays mock financial data.
+and API access work. No mock financial data is displayed.
 
 ### Authentication and backend requirements
 
@@ -78,23 +78,3 @@ Errors hide old records rather than representing stale data as current.
 Before real use, verify login, CORS, ledger schema, authorization denial, audit
 logging, hold policy, and override outcome against a sandbox treasury backend.
 No authenticated backend or financial action has been validated by this change.
-
-
-## Simulated Mode (paper review)
-
-Live mode remains the default on every page load. Turn on **SIMULATED MODE** in
-the Aegis Mind dashboard header to review sample records without credentials or
-backend requests. The banner and every sample card show
-`[SIMULATED - PAPER TEST]`; amounts, hashes and statuses are not real financial data.
-
-**Clear paper hold (simulation only)** updates only in-memory sample state and
-shows an explicitly simulated result. **Reset paper telemetry** restores the
-samples. No API calls or token creation/storage are used by simulated mode.
-Switching into simulation unmounts the live view, cancels its polling/request,
-and keeps late live responses out of the paper UI. A live action already sent
-cannot be undone by switching modes; switching is disabled while it is pending.
-
-Switching back mounts a fresh live view with no paper records or success messages.
-Live errors never activate simulation automatically, and live hold changes still
-require a successful authenticated backend response. Reload resets to live mode;
-paper state is deliberately not persisted.

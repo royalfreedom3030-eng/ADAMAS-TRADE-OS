@@ -481,10 +481,3 @@ button:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
 @media (max-width: 600px) {
   .topbar { align-items: flex-start; gap: 16px; flex-direction: column; }
 }
-
-.ledger-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
-.mode-toggle { display: flex; align-items: center; gap: 8px; font-weight: 700; }
-.mode-toggle input { width: 20px; height: 20px; accent-color: #fbbf24; }
-.mode-toggle input:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
-.simulation-label { color: #fbbf24; font-weight: 700; }
-.simulation-notice { border: 1px solid #fbbf24; }
