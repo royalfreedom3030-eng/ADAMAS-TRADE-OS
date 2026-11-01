@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchTreasuryLedger, type LedgerEntry } from '../services/aegisApi';
+import { fetchTreasuryLedger, SessionExpiredError, type LedgerEntry } from '../services/aegisApi';
 
-export function useLiveLedger(pollIntervalMs = 10000) {
+export function useLiveLedger(pollIntervalMs = 10000, onSessionExpired?: (message: string) => void) {
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -13,6 +13,7 @@ export function useLiveLedger(pollIntervalMs = 10000) {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     setLoading(true);
+    let sessionExpired = false;
 
     async function loadData() {
       const timeout = setTimeout(() => controller.abort(), 15000);
@@ -26,6 +27,10 @@ export function useLiveLedger(pollIntervalMs = 10000) {
       } catch (err) {
         // Cleanup aborts must not update an unmounted component; timeouts should be visible.
         if (active) {
+          if (err instanceof SessionExpiredError) {
+            sessionExpired = true;
+            onSessionExpired?.(err.message);
+          }
           setEntries([]);
           setLastUpdated(null);
           setError(controller.signal.aborted ? 'Treasury request timed out. Retry to reconnect.' :
@@ -36,7 +41,7 @@ export function useLiveLedger(pollIntervalMs = 10000) {
         if (active) {
           setLoading(false);
           // Schedule after completion, never overlap slow requests. Retry timeouts manually.
-          if (!controller.signal.aborted) timer = setTimeout(loadData, Math.max(1000, pollIntervalMs));
+          if (!controller.signal.aborted && !sessionExpired) timer = setTimeout(loadData, Math.max(1000, pollIntervalMs));
         }
       }
     }
@@ -47,7 +52,7 @@ export function useLiveLedger(pollIntervalMs = 10000) {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [pollIntervalMs, revision]);
+  }, [pollIntervalMs, revision, onSessionExpired]);
 
   return { entries, loading, error, lastUpdated, refresh };
 }

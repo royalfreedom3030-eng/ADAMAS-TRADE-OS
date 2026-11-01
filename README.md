@@ -6,7 +6,7 @@ A React + TypeScript treasury ledger dashboard backed by an authenticated API.
 
 - Treasury ledger with non-overlapping polling
 - Explicit authentication, validation and connection errors
-- Backend-authorized hold-review requests with confirmation
+- User-scoped session connection and local disconnect
 - Responsive dashboard layout
 
 ## Tech Stack
@@ -38,43 +38,57 @@ The supplied URL is a configuration target, not evidence that the backend exists
 or is reachable. The UI shows a disconnected/error state until authentication
 and API access work. No mock financial data is displayed.
 
-### Authentication and backend requirements
+### User-scoped session authentication
 
-The service reads a **short-lived, user-scoped bearer token** from the existing
-`adamas_auth_token` localStorage contract. This repository does not include a
-login/token issuance or refresh flow. Your identity-provider integration must
-supply it. Do not paste long-lived service secrets into source, build variables, or browser storage;
-never use a treasury service credential or private signing key as a user token.
-LocalStorage is accessible to JavaScript/XSS; a server-side session/BFF is
-preferable for privileged financial operations and needs a separate backend
-contract. Missing/expired tokens are shown as errors, not empty-success data.
+Use **Connect treasury session** with the ephemeral, user-scoped credential issued
+for the dashboard. It is sent as `{ apiKey }` to `POST /auth/token`, matching the
+supplied backend contract. Only `{ success: true, data: { token: string } }` after
+an HTTP success establishes a session. The input is masked and cleared on submit;
+neither credentials nor tokens are logged or placed in Vite environment variables.
+Master/service credentials and private signing keys must remain server-side.
 
-The API must allow the intended frontend origin through CORS, including
-`Authorization` and `Content-Type` request headers, GET/POST and preflight OPTIONS.
-It must authenticate every request and enforce role, compliance and capital-risk
-checks server-side. Decorative authority/status headers confer no privileges and
-are not sent. Responses and statuses are not cryptographically verified: the
-provided Ed25519 public key cannot be used without a documented signature format,
-canonical payload and trusted key-distribution/rotation contract.
+The returned bearer token is stored under `adamas_auth_token` in **sessionStorage**,
+not localStorage. It survives reload in that tab, and is normally removed when the
+tab closes. Browser tab duplication/session restoration can copy/restore it;
+server-enforced short expiry is still essential. Old localStorage tokens are never
+read or migrated and are removed on connect/disconnect where storage permits.
+Disconnect clears the local session, removes ledger state, and cancels polling;
+it is not server-side revocation. HTTP 401 clears the current stored token and
+returns to Connect. HTTP 403 stays an authorization error. No token is fabricated,
+and auth errors never display sample data or local success.
 
-Expected API contract (confirm with your backend before enabling production):
+sessionStorage is JavaScript/XSS-accessible, not encrypted secret storage. If
+storage is blocked, connection fails explicitly rather than using persistent
+storage. The frontend cannot determine an opaque token's expiry; the backend
+must enforce it. No refresh or revocation endpoint was provided, so there is no
+automatic refresh: reconnect with a newly issued user session credential after
+expiry. Never use a master credential to reconnect.
 
-- `GET /treasury/ledger`: `{ "success": true, "data": [...] }`. Every entry has
-  nonempty string `id`, `timestamp`, `hash`, `category`, `status`. Optional string
-  fields: `amount`, `strategy`, `strategyId`. IDs must be unique. `success: false`,
-  malformed entries, HTTP errors and invalid JSON are surfaced as failures.
-- `POST /strategy/override`: `{ strategyId, action: "CLEAR_HOLD", timestamp }`.
-  Only `{ "success": true }` confirms acceptance. A ledger ID is never assumed to
-  be a strategy ID. The review button appears only for HELD entries and is disabled
-  without an explicit `strategyId`. A confirmation is required. There is no
-  automatic retry or optimistic hold clearance; the ledger is fetched again.
-  A failed/timed-out request can have an uncertain server outcome: verify before
-  retrying. This client does not provide server-side idempotency or audit logging.
+### API contract
 
-Polling waits ten seconds after each completed request (no overlap), aborts on
-unmount, and times out at fifteen seconds. Timeout recovery uses Refresh ledger.
-Errors hide old records rather than representing stale data as current.
+`VITE_API_BASE_URL` must be an HTTPS base URL without credentials, query or fragment.
+The API must allow the intended dashboard origins through CORS (including OPTIONS,
+GET/POST, Authorization and Content-Type). Redirects are rejected and requests use
+no-store. Decorative authority headers are not sent or treated as authorization.
 
-Before real use, verify login, CORS, ledger schema, authorization denial, audit
-logging, hold policy, and override outcome against a sandbox treasury backend.
-No authenticated backend or financial action has been validated by this change.
+- `POST /auth/token`: `{ apiKey: string }` (user-scoped ephemeral credential);
+  response `{ success: true, data: { token: string } }`.
+- `GET /treasury/ledger`: Bearer session token; response
+  `{ success: true, data: LedgerEntry[] }`. Every entry has unique, nonempty string
+  `id`, `timestamp`, `asset`, `source`; finite numeric `amount`; and status
+  `SETTLED`, `HELD` or `FAILED`. Empty data is valid; malformed/unsuccessful data,
+  HTTP errors and invalid JSON are failures. Financial payloads and backend error
+  bodies are not echoed into logs or validation messages.
+- `POST /strategy/override`: the service method accepts `{ action, targetId }`
+  with action `CLEAR_HOLD` or `FORCE_EXECUTE`; only HTTP success and
+  `{ success: true, data: { status: true } }` confirms success. No retries or
+  optimistic local hold clearance. The new ledger schema has **no strategy target
+  mapping**, so the ledger UI is read-only and offers no override controls. A
+  ledger ID must not be guessed to be a strategy target ID.
+
+Polling waits ten seconds after completion, aborts on disconnect/unmount and
+times out after fifteen seconds. Refresh ledger retries a timed-out GET. Failed
+requests hide stale ledger data. Backend verification, CORS and a real authenticated
+session still need end-to-end testing; code checks alone do not prove live access.
+Server-side authorization/risk checks, audit logging, idempotency, refresh/revocation
+and an Ed25519 signature format are not implemented by this frontend.
