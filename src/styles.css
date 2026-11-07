@@ -466,3 +466,22 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* Treasury overview: reuse the existing dashboard's panels and controls. */
+.ledger-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 20px;
+}
+.ledger-notice, .ledger-entry { padding: 20px; margin-bottom: 20px; }
+.ledger-error { color: #fca5a5; }
+.ledger-entry, .ledger-hash { overflow-wrap: anywhere; }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+button:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
+@media (max-width: 600px) {
+  .topbar { align-items: flex-start; gap: 16px; flex-direction: column; }
+}
+
+.session-form { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.session-form input { width: min(100%, 420px); padding: 10px; }
+.session-form input:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
